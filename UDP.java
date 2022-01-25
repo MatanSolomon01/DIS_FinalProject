@@ -49,6 +49,15 @@ public class UDP extends Thread
                 e.printStackTrace();
             }
         }
+        if(this.received.equals(MyConstants.SHUT_DOWN)){
+            try{
+                shut_down();
+            } catch (IOException e){
+                e.printStackTrace();
+            }
+        }
+
+
         String[] received_split = received.split(";");
         if (received_split[0].equals(MyConstants.FORWARD)) {
             try {
@@ -60,6 +69,11 @@ public class UDP extends Thread
 
     }
 
+    private void shut_down() throws IOException
+    {
+
+    }
+
     public void forward() throws IOException {
         File myObj = new File(this.forwardingFilePrefix + this.name + ".txt");
         myObj.createNewFile();
@@ -68,14 +82,22 @@ public class UDP extends Thread
         myWriter.close();
         String[] received_split = received.split(";");
         int hops = Integer.parseInt(received_split[2])-1;
-        if (hops!=0) {
+        int dest = Integer.parseInt(received_split[1]);
+        if (hops!=0 & dest != this.name) {
             received_split[2] = String.valueOf(hops);
             String message_to_send = String.join(";", received_split);
-            int dest = Integer.parseInt(received_split[1]);
-            Routing line = this.routing_table[dest];
+            Routing line = this.routing_table[dest-1];
             String ip = this.neighbors.get(line.next).ip_router;
             int port = this.neighbors.get(line. next).udp_port_neighbore;
             byte[] bytesToSend = message_to_send.getBytes(StandardCharsets.UTF_8);
+            DatagramPacket packetToSend = new DatagramPacket(bytesToSend, bytesToSend.length, InetAddress.getByName(ip), port);
+            this.socket.send(packetToSend);
+        }
+        else{
+            String message = received_split[3];
+            byte[] bytesToSend = message.getBytes(StandardCharsets.UTF_8);
+            String ip = received_split[4];
+            int port = Integer.parseInt(received_split[5]);
             DatagramPacket packetToSend = new DatagramPacket(bytesToSend, bytesToSend.length, InetAddress.getByName(ip), port);
             this.socket.send(packetToSend);
         }
