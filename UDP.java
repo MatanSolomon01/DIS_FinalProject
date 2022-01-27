@@ -1,10 +1,7 @@
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,12 +18,14 @@ public class UDP extends Thread
     private String received;
     InetAddress address;
     int port;
-    DatagramSocket socket;
+    private DatagramSocket udp_socket;
+    private ServerSocket tcp_socket;
     private HashMap<Integer,Neighbore> neighbors;
+    private int update_number;
 
-    public UDP(DatagramPacket packet,byte[] buf, String tableFilePrefix, String forwardingFilePrefix, int name,
+    public UDP(DatagramPacket packet, byte[] buf, String tableFilePrefix, String forwardingFilePrefix, int name,
                int number_of_routers, Routing[]  routing_table, String received, InetAddress address, int port,
-               DatagramSocket socket, HashMap<Integer,Neighbore> neighbors)
+               DatagramSocket socket, ServerSocket tcp_Socket, HashMap<Integer,Neighbore> neighbors, int update_number)
     {
         this.packet = packet;
         this.buf = buf;
@@ -38,13 +37,15 @@ public class UDP extends Thread
         this.received = received;
         this.address = address;
         this.port = port;
-        this.socket = socket;
+        this.udp_socket = socket;
+        this.tcp_socket = tcp_Socket;
         this.neighbors = neighbors;
+        this.update_number = update_number;
     }
     public void run(){
         if (this.received.equals(MyConstants.PRINT_ROUTING_TABLE)) {
             try {
-                print_routing_table();
+                 print_routing_table();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -56,6 +57,15 @@ public class UDP extends Thread
                 e.printStackTrace();
             }
         }
+
+        if(this.received.equals(MyConstants.UPDATE_ROUTING_TABLE)){
+            try{
+                update_routing_table();
+            } catch (IOException e){
+                e.printStackTrace();
+            }
+        }
+
 
 
         String[] received_split = received.split(";");
@@ -69,6 +79,13 @@ public class UDP extends Thread
 
     }
 
+    private void update_routing_table() throws IOException{
+        Socket clientSocket = this.tcp_socket.accept();
+        ArrayList<Integer> message = new ArrayList<>();
+        message.add(this.update_number);
+        STCP send_massage = new STCP(clientSocket, message, false);
+        send_massage.start();
+    }
     private void shut_down() throws IOException
     {
 
@@ -91,7 +108,7 @@ public class UDP extends Thread
             int port = this.neighbors.get(line. next).udp_port_neighbore;
             byte[] bytesToSend = message_to_send.getBytes(StandardCharsets.UTF_8);
             DatagramPacket packetToSend = new DatagramPacket(bytesToSend, bytesToSend.length, InetAddress.getByName(ip), port);
-            this.socket.send(packetToSend);
+            this.udp_socket.send(packetToSend);
         }
         else{
             String message = received_split[3];
@@ -99,7 +116,7 @@ public class UDP extends Thread
             String ip = received_split[4];
             int port = Integer.parseInt(received_split[5]);
             DatagramPacket packetToSend = new DatagramPacket(bytesToSend, bytesToSend.length, InetAddress.getByName(ip), port);
-            this.socket.send(packetToSend);
+            this.udp_socket.send(packetToSend);
         }
 
 
@@ -119,7 +136,7 @@ public class UDP extends Thread
         myWriter.close();
         byte[] bytesToSend = "FINISH".getBytes(StandardCharsets.UTF_8);
         DatagramPacket packetToSend = new DatagramPacket(bytesToSend, bytesToSend.length, this.address, this.port);
-        this.socket.send(packetToSend);
+        this.udp_socket.send(packetToSend);
 
     }
 }
